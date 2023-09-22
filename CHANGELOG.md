@@ -1,3 +1,7 @@
+# 0.4.7
+
+* [feature] Bump Ruby version
+
 # 0.4.6
 
 * [feature] added new `--webpack` option to convert stylesheets for use with webpack. #45
