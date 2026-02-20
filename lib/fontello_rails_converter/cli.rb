@@ -213,7 +213,7 @@ module FontelloRailsConverter
       end
 
       def stylesheet_file(postfix: '', extension: '.css')
-        if fontello_name && !@options[:stylesheet_dir].empty?
+        if fontello_name && @options[:stylesheet_dir] && !@options[:stylesheet_dir].empty?
           File.join(@options[:stylesheet_dir], "#{fontello_name}#{postfix}#{extension}")
         end
       end
@@ -222,7 +222,7 @@ module FontelloRailsConverter
         @_fontello_name ||=
           if config_file_exists?
             name_from_config = JSON.parse(File.read(@options[:config_file]))['name']
-            name_from_config.empty? ? 'fontello' : name_from_config
+            name_from_config.nil? || name_from_config.empty? ? 'fontello' : name_from_config
           end
       end
   end
