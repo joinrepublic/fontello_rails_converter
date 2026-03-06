@@ -79,7 +79,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           VERSION: ${{ steps.gem_version.outputs.version }}
         run: |
-          if gem list '^fontello_rails_converter$' -ra --source "https://rubygems.pkg.github.com/${OWNER}" --key github | grep -Eq "\(${VERSION}(,|\))"; then
+          if gem list '^fontello_rails_converter$' -ra --source "https://rubygems.pkg.github.com/${OWNER}" | grep -Eq "\(${VERSION}(,|\))"; then
             echo "publish_needed=false" >> "$GITHUB_OUTPUT"
             echo "Version ${VERSION} already exists in GitHub Packages. Skipping publish."
           else
