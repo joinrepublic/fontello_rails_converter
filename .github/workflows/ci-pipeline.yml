@@ -1,0 +1,232 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ci-pipeline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr_linter:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      (github.event.action != 'edited' || github.event.changes.title != null)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title against Conventional Commits
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            chore
+            docs
+            refactor
+            test
+            perf
+            ci
+            build
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: >-
+            The subject must start with a lowercase letter for Conventional Commits.
+
+  rubocop:
+    needs:
+      - pr_linter
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      (needs.pr_linter.result == 'success' || needs.pr_linter.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby environment
+        uses: ./.github/actions/setup-ruby-env
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+  rspec:
+    needs:
+      - pr_linter
+      - rubocop
+    if: >-
+      always() &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+      ) &&
+      (needs.pr_linter.result == 'success' || needs.pr_linter.result == 'skipped') &&
+      (needs.rubocop.result == 'success' || needs.rubocop.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby environment
+        uses: ./.github/actions/setup-ruby-env
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Run RSpec
+        run: bundle exec rspec
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ github.run_id }}
+          path: |
+            coverage/.last_run.json
+            coverage/.resultset.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+  simplecov:
+    needs:
+      - rspec
+    if: always() && needs.rspec.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-data-${{ github.run_id }}
+          path: coverage
+
+      - name: Extract coverage metrics
+        id: coverage
+        run: |
+          ruby <<'RUBY' >> "$GITHUB_OUTPUT"
+          require 'json'
+
+          last_run_path = 'coverage/.last_run.json'
+          resultset_path = 'coverage/.resultset.json'
+
+          last_run = JSON.parse(File.read(last_run_path))
+          result = last_run.fetch('result', {})
+          line = result.fetch('line', 0.0)
+
+          if line.is_a?(Hash)
+            covered_percent = line.fetch('covered_percent', 0.0).to_f
+            covered_lines = line.fetch('covered_lines', 0).to_i
+            total_lines = line.fetch('total_lines', 0).to_i
+          else
+            covered_percent = line.to_f
+            resultset = JSON.parse(File.read(resultset_path))
+            coverage_by_command = resultset.values.find { |entry| entry.is_a?(Hash) && entry['coverage'].is_a?(Hash) }
+            file_coverages = coverage_by_command ? coverage_by_command['coverage'].values : []
+            line_arrays = file_coverages.filter_map { |file| file.is_a?(Hash) ? file['lines'] : nil }
+            flattened = line_arrays.flatten
+            executable = flattened.select { |value| value.is_a?(Integer) }
+
+            total_lines = executable.size
+            covered_lines = executable.count { |value| value.positive? }
+          end
+
+          missed_lines = [total_lines - covered_lines, 0].max
+          covered_percent = if total_lines.positive?
+                              ((covered_lines.to_f / total_lines) * 100).round(2)
+                            else
+                              covered_percent.round(2)
+                            end
+
+          puts "covered_percent=#{covered_percent}"
+          puts "covered_lines=#{covered_lines}"
+          puts "total_lines=#{total_lines}"
+          puts "missed_lines=#{missed_lines}"
+          RUBY
+
+      - name: Add coverage to job summary
+        run: |
+          {
+            echo "## Coverage Summary"
+            echo ""
+            echo "- Line Coverage: **${{ steps.coverage.outputs.covered_percent }}%**"
+            echo "- Covered Lines: ${{ steps.coverage.outputs.covered_lines }}"
+            echo "- Missed Lines: ${{ steps.coverage.outputs.missed_lines }}"
+            echo "- Total Lines: ${{ steps.coverage.outputs.total_lines }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment coverage in PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        uses: actions/github-script@v7
+        env:
+          COVERED_PERCENT: ${{ steps.coverage.outputs.covered_percent }}
+          COVERED_LINES: ${{ steps.coverage.outputs.covered_lines }}
+          TOTAL_LINES: ${{ steps.coverage.outputs.total_lines }}
+          MISSED_LINES: ${{ steps.coverage.outputs.missed_lines }}
+        with:
+          script: |
+            const marker = '<!-- coverage-report -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const prNumber = context.issue.number;
+
+            const body = [
+              marker,
+              '## Test Coverage Report',
+              '',
+              '| Metric | Value |',
+              '| --- | ---: |',
+              `| Line Coverage | **${process.env.COVERED_PERCENT}%** |`,
+              `| Covered Lines | ${process.env.COVERED_LINES} |`,
+              `| Missed Lines | ${process.env.MISSED_LINES} |`,
+              `| Total Lines | ${process.env.TOTAL_LINES} |`,
+              '',
+              `CI workflow run: [view details](${runUrl})`
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100
+            });
+
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body
+              });
+            }

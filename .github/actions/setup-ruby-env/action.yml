@@ -1,0 +1,21 @@
+name: Setup Ruby Environment
+description: Set up Ruby with Bundler and gem cache
+
+inputs:
+  ruby-version:
+    description: Ruby version to install
+    required: false
+    default: '3.3'
+  bundler-cache:
+    description: Enable Bundler dependency cache
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Ruby and Bundler cache
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        bundler-cache: ${{ inputs.bundler-cache }}

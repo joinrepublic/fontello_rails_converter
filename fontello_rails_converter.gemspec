@@ -20,8 +20,15 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = '>= 2.0'
 
-  spec.add_runtime_dependency "rubyzip", "~> 1.0"
+  spec.add_runtime_dependency "rubyzip", ">= 1.0", "< 3.0"
+  spec.add_runtime_dependency "faraday", ">= 1.0", "< 3.0"
   spec.add_runtime_dependency "launchy"
-  spec.add_runtime_dependency "rest-client"
   spec.add_runtime_dependency "activesupport"
+
+  spec.add_development_dependency "pry-byebug"
+  spec.add_development_dependency "rake"
+  spec.add_development_dependency "rspec"
+  spec.add_development_dependency "rubocop", "~> 1.72"
+  spec.add_development_dependency "rubocop-rake"
+  spec.add_development_dependency "simplecov"
 end

@@ -1,19 +1,22 @@
 require 'spec_helper'
 
 describe FontelloRailsConverter::FontelloApi do
+  let(:config_file) { File.expand_path('fixtures/minimal-config.json', __dir__) }
+  let(:session_file) { File.expand_path('fixtures/fontello_session_id_persisted', __dir__) }
+
   context 'no persistence' do
-    subject { described_class.new config_file: File.expand_path('../fixtures/minimal-config.json', __FILE__), fontello_session_id_file: File.expand_path('../fixtures/fontello_session_id_persisted', __FILE__) }
+    subject { described_class.new config_file: config_file, fontello_session_id_file: session_file }
 
     before do
       allow(subject).to receive(:persist_session)
     end
 
     describe '#new_session_from_config' do
-      before do
-        expect(RestClient).to receive(:post).and_return 'NEWIDFROMCONFIG'
-      end
-
       specify do
+        request = instance_double('Faraday::Request', headers: {})
+        allow(request).to receive(:body=)
+
+        expect(Faraday).to receive(:post).with('https://fontello.com').and_yield(request).and_return(double(body: 'NEWIDFROMCONFIG'))
         expect(subject).to receive(:persist_session)
         expect(subject.new_session_from_config).to eql 'NEWIDFROMCONFIG'
       end
@@ -31,12 +34,14 @@ describe FontelloRailsConverter::FontelloApi do
 
     describe '#download_zip_body' do
       before do
-        subject.new_session_from_config # from config
+        allow(subject).to receive(:session_url).and_return('https://fontello.com/abc123')
+        allow(Faraday).to receive(:get).with('https://fontello.com/abc123/get').and_return(double(body: 'binary-makerist.ttf-content'))
       end
+
       it 'should be a long string with the body of the zip file' do
         zip_body = subject.download_zip_body
-        expect(zip_body).to be_instance_of String
-        expect(zip_body).to include "makerist.ttf"
+        expect(zip_body).to be_a String
+        expect(zip_body).to include 'makerist.ttf'
       end
     end
 
@@ -78,7 +83,7 @@ describe FontelloRailsConverter::FontelloApi do
 
       context 'file is empty' do
         before do
-          subject.instance_variable_set :@fontello_session_id_file, File.expand_path('../fixtures/fontello_session_id_empty', __FILE__)
+          subject.instance_variable_set :@fontello_session_id_file, File.expand_path('fixtures/fontello_session_id_empty', __dir__)
         end
 
         specify do
@@ -90,7 +95,10 @@ describe FontelloRailsConverter::FontelloApi do
   end
 
   context 'with persistence' do
-    subject { described_class.new fontello_session_id: 'MYID', fontello_session_id_file: File.expand_path('../fixtures/fontello_session_id_changing', __FILE__) }
+    subject do
+      described_class.new fontello_session_id: 'MYID',
+                          fontello_session_id_file: File.expand_path('fixtures/fontello_session_id_changing', __dir__)
+    end
 
     describe '#persist_session' do
       specify do

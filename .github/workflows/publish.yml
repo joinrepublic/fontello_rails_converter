@@ -1,0 +1,79 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+  workflow_run:
+    workflows:
+      - Release
+    branches:
+      - master
+    types:
+      - completed
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-gem:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Set up Ruby environment
+        uses: ./.github/actions/setup-ruby-env
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Resolve gem version from gemspec
+        id: gem_version
+        run: |
+          VERSION=$(ruby -e "spec = Gem::Specification.load('fontello_rails_converter.gemspec'); puts spec.version.to_s")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure RubyGems credentials for GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$HOME/.gem"
+          cat > "$HOME/.gem/credentials" <<EOF
+          ---
+          :github: Bearer ${GITHUB_TOKEN}
+          EOF
+          chmod 0600 "$HOME/.gem/credentials"
+
+      - name: Check whether version is already published
+        id: publish_guard
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.gem_version.outputs.version }}
+        run: |
+          if gem list '^fontello_rails_converter$' -ra --source "https://rubygems.pkg.github.com/${OWNER}" --key github | grep -Eq "\(${VERSION}(,|\))"; then
+            echo "publish_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} already exists in GitHub Packages. Skipping publish."
+          else
+            echo "publish_needed=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is not published yet. Proceeding."
+          fi
+
+      - name: Build gem
+        if: steps.publish_guard.outputs.publish_needed == 'true'
+        run: gem build fontello_rails_converter.gemspec
+
+      - name: Publish gem to GitHub Packages
+        if: steps.publish_guard.outputs.publish_needed == 'true'
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          GEM_FILE=$(ls -1 *.gem | head -n 1)
+          gem push --key github --host "https://rubygems.pkg.github.com/${OWNER}" "${GEM_FILE}"

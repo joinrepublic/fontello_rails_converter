@@ -1,3 +1,7 @@
+# 0.4.8
+
+* [feature] Bump rubyzip version to 2.0.0+
+
 # 0.4.7
 
 * [feature] Bump Ruby version
