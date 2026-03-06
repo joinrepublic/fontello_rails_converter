@@ -5,6 +5,8 @@ AllCops:
   Exclude:
     - 'bin/fontello'
     - 'fontello_rails_converter.gemspec'
+    - 'vendor/**/*'
+    - 'vendor/bundle/**/*'
     - 'spec/dummy_rails_root/**/*'
     - 'spec/fixtures/**/*'
 
