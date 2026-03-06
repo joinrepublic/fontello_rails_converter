@@ -1,9 +1,6 @@
 name: Publish
 
 on:
-  release:
-    types:
-      - published
   workflow_run:
     workflows:
       - Release
@@ -11,16 +8,40 @@ on:
       - master
     types:
       - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  guard:
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.check_jobs.outputs.release_created }}
+    steps:
+      - name: Check release-please job conclusion
+        id: check_jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CONCLUSION=$(gh api \
+            "/repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/jobs" \
+            | jq -r '[.jobs[] | select(.name == "release-please")] | first | .conclusion // "skipped"')
+          echo "Release run ${{ github.event.workflow_run.id }} → release-please conclusion: ${CONCLUSION}"
+          if [ "$CONCLUSION" = "success" ]; then
+            echo "release_created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_created=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-gem:
+    needs: [ guard ]
     if: >-
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && needs.guard.outputs.release_created == 'true'))
     runs-on: ubuntu-latest
 
     steps:
@@ -29,64 +50,19 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
-      - name: Resolve gem version from gemspec
-        id: gem_version
-        run: |
-          VERSION=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' lib/fontello_rails_converter/version.rb)
-          if [ -z "${VERSION}" ]; then
-            echo "Error: Could not extract gem version from lib/fontello_rails_converter/version.rb" >&2
-            exit 1
-          fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate release exists for version
-        id: release_guard
-        uses: actions/github-script@v7
-        env:
-          VERSION: ${{ steps.gem_version.outputs.version }}
-        with:
-          script: |
-            const version = process.env.VERSION;
-
-            if (context.eventName === 'release') {
-              const tagName = context.payload && context.payload.release && context.payload.release.tag_name;
-              const expectedTags = [`v${version}`, version];
-              const isMatch = !!tagName && expectedTags.includes(tagName);
-
-              core.setOutput('release_valid', isMatch ? 'true' : 'false');
-              return;
-            }
-
-            const tags = [`v${version}`, version];
-            let found = false;
-
-            for (const tag of tags) {
-              try {
-                await github.rest.repos.getReleaseByTag({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  tag
-                });
-                found = true;
-                break;
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
-              }
-            }
-
-            core.setOutput('release_valid', found ? 'true' : 'false');
-
       - name: Set up Ruby environment
-        if: steps.release_guard.outputs.release_valid == 'true'
         uses: ./.github/actions/setup-ruby-env
         with:
           ruby-version: '3.3'
           bundler-cache: true
 
+      - name: Resolve gem version from gemspec
+        id: gem_version
+        run: |
+          VERSION=$(ruby -e "spec = Gem::Specification.load('fontello_rails_converter.gemspec'); puts spec.version.to_s")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Configure RubyGems credentials for GitHub Packages
-        if: steps.release_guard.outputs.release_valid == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -99,7 +75,6 @@ jobs:
 
       - name: Check whether version is already published
         id: publish_guard
-        if: steps.release_guard.outputs.release_valid == 'true'
         env:
           OWNER: ${{ github.repository_owner }}
           VERSION: ${{ steps.gem_version.outputs.version }}
@@ -113,11 +88,11 @@ jobs:
           fi
 
       - name: Build gem
-        if: steps.release_guard.outputs.release_valid == 'true' && steps.publish_guard.outputs.publish_needed == 'true'
+        if: steps.publish_guard.outputs.publish_needed == 'true'
         run: gem build fontello_rails_converter.gemspec
 
       - name: Publish gem to GitHub Packages
-        if: steps.release_guard.outputs.release_valid == 'true' && steps.publish_guard.outputs.publish_needed == 'true'
+        if: steps.publish_guard.outputs.publish_needed == 'true'
         env:
           OWNER: ${{ github.repository_owner }}
         run: |
