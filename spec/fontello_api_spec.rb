@@ -12,11 +12,11 @@ describe FontelloRailsConverter::FontelloApi do
     end
 
     describe '#new_session_from_config' do
-      before do
-        expect(RestClient).to receive(:post).and_return 'NEWIDFROMCONFIG'
-      end
-
       specify do
+        request = instance_double('Faraday::Request', headers: {})
+        allow(request).to receive(:body=)
+
+        expect(Faraday).to receive(:post).with('https://fontello.com').and_yield(request).and_return(double(body: 'NEWIDFROMCONFIG'))
         expect(subject).to receive(:persist_session)
         expect(subject.new_session_from_config).to eql 'NEWIDFROMCONFIG'
       end
@@ -35,7 +35,7 @@ describe FontelloRailsConverter::FontelloApi do
     describe '#download_zip_body' do
       before do
         allow(subject).to receive(:session_url).and_return('https://fontello.com/abc123')
-        allow(RestClient).to receive(:get).with('https://fontello.com/abc123/get').and_return(double(body: 'binary-makerist.ttf-content'))
+        allow(Faraday).to receive(:get).with('https://fontello.com/abc123/get').and_return(double(body: 'binary-makerist.ttf-content'))
       end
 
       it 'should be a long string with the body of the zip file' do

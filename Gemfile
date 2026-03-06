@@ -6,10 +6,10 @@ gemspec
 group :development, :test do
   gem 'rake'
   gem 'rspec'
+  gem 'rubocop', '~> 1.72', require: false
   gem 'simplecov', require: false
 end
 
 group :development do
   gem 'pry-byebug'
-  gem 'rubocop', '~> 1.72', require: false
 end
