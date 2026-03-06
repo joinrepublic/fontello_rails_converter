@@ -45,7 +45,11 @@ jobs:
             const version = process.env.VERSION;
 
             if (context.eventName === 'release') {
-              core.setOutput('release_valid', 'true');
+              const tagName = context.payload && context.payload.release && context.payload.release.tag_name;
+              const expectedTags = [`v${version}`, version];
+              const isMatch = !!tagName && expectedTags.includes(tagName);
+
+              core.setOutput('release_valid', isMatch ? 'true' : 'false');
               return;
             }
 
