@@ -32,7 +32,11 @@ jobs:
       - name: Resolve gem version from gemspec
         id: gem_version
         run: |
-          VERSION=$(ruby -e "spec = Gem::Specification.load('fontello_rails_converter.gemspec'); puts spec.version.to_s")
+          VERSION=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' lib/fontello_rails_converter/version.rb)
+          if [ -z "${VERSION}" ]; then
+            echo "Error: Could not extract gem version from lib/fontello_rails_converter/version.rb" >&2
+            exit 1
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Validate release exists for version
