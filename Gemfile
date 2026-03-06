@@ -7,6 +7,7 @@ group :development, :test do
   gem 'rake'
   gem 'rspec'
   gem 'rubocop', '~> 1.72', require: false
+  gem 'rubocop-rake', require: false
   gem 'simplecov', require: false
 end
 
