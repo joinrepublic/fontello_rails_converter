@@ -3,15 +3,13 @@ source 'https://rubygems.org'
 # Specify your gem's dependencies in fontello_rails_converter.gemspec
 gemspec
 
-group :test do
+group :development, :test do
   gem 'rake'
   gem 'rspec'
-  gem 'rails-dummy'
-  gem 'rails', '>= 4.0'
-  gem 'sqlite3' # dummy app dependency
-  gem 'bundler', '>= 1.10'
+  gem 'simplecov', require: false
 end
 
 group :development do
   gem 'pry-byebug'
+  gem 'rubocop', '~> 1.72', require: false
 end

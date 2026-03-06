@@ -3,7 +3,7 @@ require 'json'
 
 module FontelloRailsConverter
   class FontelloApi
-    FONTELLO_HOST = "https://fontello.com"
+    FONTELLO_HOST = "https://fontello.com".freeze
 
     def initialize(options)
       @config_file = options[:config_file]
@@ -29,21 +29,21 @@ module FontelloRailsConverter
 
     private
 
-      def session_id
-        @session_id ||= read_or_create_session
+    def session_id
+      @session_id ||= read_or_create_session
+    end
+
+    def read_or_create_session
+      if @fontello_session_id_file && File.exist?(@fontello_session_id_file)
+        @session_id = File.read(@fontello_session_id_file)
+        return @session_id unless @session_id == ""
       end
 
-      def read_or_create_session
-        if @fontello_session_id_file && File.exist?(@fontello_session_id_file)
-          @session_id = File.read(@fontello_session_id_file)
-          return @session_id  unless @session_id == ""
-        end
+      new_session_from_config
+    end
 
-        new_session_from_config
-      end
-
-      def persist_session
-        File.open(@fontello_session_id_file, 'w+') { |f| f.write @session_id }
-      end
+    def persist_session
+      File.write(@fontello_session_id_file, @session_id)
+    end
   end
 end
