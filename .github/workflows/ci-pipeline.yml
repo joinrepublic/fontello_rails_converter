@@ -17,6 +17,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write # required for OIDC login to AWS CodeArtifact
 
 concurrency:
   group: ci-pipeline-${{ github.workflow }}-${{ github.ref }}
@@ -32,7 +33,7 @@ jobs:
 
     steps:
       - name: Validate PR title against Conventional Commits
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -63,13 +64,14 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Ruby environment
         uses: ./.github/actions/setup-ruby-env
         with:
           ruby-version: '3.3'
           bundler-cache: true
+          aws-role-arn: ${{ vars.AWS_CODEARTIFACT_READ_ROLE_ARN }}
 
       - name: Run RuboCop
         run: bundle exec rubocop
@@ -90,19 +92,20 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Ruby environment
         uses: ./.github/actions/setup-ruby-env
         with:
           ruby-version: '3.3'
           bundler-cache: true
+          aws-role-arn: ${{ vars.AWS_CODEARTIFACT_READ_ROLE_ARN }}
 
       - name: Run RSpec
         run: bundle exec rspec
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-data-${{ github.run_id }}
           path: |
@@ -119,7 +122,7 @@ jobs:
 
     steps:
       - name: Download coverage data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: coverage-data-${{ github.run_id }}
           path: coverage
@@ -180,7 +183,7 @@ jobs:
 
       - name: Comment coverage in PR
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           COVERED_PERCENT: ${{ steps.coverage.outputs.covered_percent }}
           COVERED_LINES: ${{ steps.coverage.outputs.covered_lines }}

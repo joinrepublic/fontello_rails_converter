@@ -1,4 +1,4 @@
-source 'https://rubygems.org'
+source 'https://republic-570660171057.d.codeartifact.us-east-1.amazonaws.com/ruby/ruby-joinrepublic'
 
 # Specify your gem's dependencies in fontello_rails_converter.gemspec
 gemspec

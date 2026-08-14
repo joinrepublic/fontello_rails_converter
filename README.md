@@ -16,11 +16,18 @@ Main capabilities:
 2. Active Support: supported (`activesupport` runtime dependency).
 3. Rails: optional integration via Railtie, enabled automatically when Rails is present.
 
+## Ruby Dependencies (AWS CodeArtifact)
+
+Ruby dependencies and gem releases are served through AWS CodeArtifact (`ruby-joinrepublic` repository, which proxies and caches `rubygems.org`). Before running Bundler locally, follow
+[Setup Ruby local dev environment with AWS CodeArtifact](https://app.notion.com/p/republic/Setup-Ruby-local-dev-environment-with-AWS-CodeArtifact-36e86567bd758053bb71ebf54241fa9a).
+
 ## Installation
 
 Add to `Gemfile`:
 
 ```ruby
+source 'https://republic-570660171057.d.codeartifact.us-east-1.amazonaws.com/ruby/ruby-joinrepublic'
+
 gem 'fontello_rails_converter'
 ```
 
@@ -122,4 +129,6 @@ The project uses GitHub Actions workflows:
 
 1. `CI Pipeline`: PR linting, RuboCop, RSpec, coverage reporting.
 2. `Release`: release-please automation on successful `master` push pipeline.
-3. `Publish`: builds and publishes gem package on release events.
+3. `Publish`: builds and publishes the gem package to AWS CodeArtifact on release events.
+
+All jobs that run `bundle install` authenticate to AWS CodeArtifact via OIDC (no long-lived credentials), using the `AWS_CODEARTIFACT_READ_ROLE_ARN` (CI) and `AWS_CODEARTIFACT_PUBLISH_ROLE_ARN` (Publish) repository variables.

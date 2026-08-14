@@ -13,6 +13,9 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/railslove/fontello_rails_converter"
   spec.license       = "MIT"
 
+  spec.metadata["allowed_push_host"] =
+    "https://republic-570660171057.d.codeartifact.us-east-1.amazonaws.com/ruby/ruby-joinrepublic"
+
   spec.files         = `git ls-files`.split($/)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})

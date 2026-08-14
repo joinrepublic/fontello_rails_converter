@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write # required for OIDC login to AWS CodeArtifact
 
 jobs:
   guard:
@@ -44,9 +44,12 @@ jobs:
       (github.event_name == 'workflow_run' && needs.guard.outputs.release_created == 'true'))
     runs-on: ubuntu-latest
 
+    env:
+      CODEARTIFACT_REPOSITORY: https://republic-570660171057.d.codeartifact.us-east-1.amazonaws.com/ruby/ruby-joinrepublic
+
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
@@ -55,6 +58,7 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
+          aws-role-arn: ${{ vars.AWS_CODEARTIFACT_PUBLISH_ROLE_ARN }}
 
       - name: Resolve gem version from gemspec
         id: gem_version
@@ -62,26 +66,23 @@ jobs:
           VERSION=$(ruby -e "spec = Gem::Specification.load('fontello_rails_converter.gemspec'); puts spec.version.to_s")
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Configure RubyGems credentials for GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure RubyGems credentials for AWS CodeArtifact
         run: |
           mkdir -p "$HOME/.gem"
           cat > "$HOME/.gem/credentials" <<EOF
           ---
-          :github: Bearer ${GITHUB_TOKEN}
+          :codeartifact: aws:${CODEARTIFACT_AUTH_TOKEN}
           EOF
           chmod 0600 "$HOME/.gem/credentials"
 
       - name: Check whether version is already published
         id: publish_guard
         env:
-          OWNER: ${{ github.repository_owner }}
           VERSION: ${{ steps.gem_version.outputs.version }}
         run: |
-          if gem list '^fontello_rails_converter$' -ra --source "https://rubygems.pkg.github.com/${OWNER}" | grep -Eq "\(${VERSION}(,|\))"; then
+          if gem list '^fontello_rails_converter$' -ra --source "https://aws:${CODEARTIFACT_AUTH_TOKEN}@${CODEARTIFACT_REPOSITORY#https://}" | grep -Eq "\(${VERSION}(,|\))"; then
             echo "publish_needed=false" >> "$GITHUB_OUTPUT"
-            echo "Version ${VERSION} already exists in GitHub Packages. Skipping publish."
+            echo "Version ${VERSION} already exists in AWS CodeArtifact. Skipping publish."
           else
             echo "publish_needed=true" >> "$GITHUB_OUTPUT"
             echo "Version ${VERSION} is not published yet. Proceeding."
@@ -91,10 +92,9 @@ jobs:
         if: steps.publish_guard.outputs.publish_needed == 'true'
         run: gem build fontello_rails_converter.gemspec
 
-      - name: Publish gem to GitHub Packages
+      - name: Publish gem to AWS CodeArtifact
         if: steps.publish_guard.outputs.publish_needed == 'true'
-        env:
-          OWNER: ${{ github.repository_owner }}
         run: |
           GEM_FILE=$(ls -1 *.gem | head -n 1)
-          gem push --key github --host "https://rubygems.pkg.github.com/${OWNER}" "${GEM_FILE}"
+          gem push --key codeartifact --host "${CODEARTIFACT_REPOSITORY}" "${GEM_FILE}"
+
