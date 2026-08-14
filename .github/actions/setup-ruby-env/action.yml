@@ -1,5 +1,5 @@
 name: Setup Ruby Environment
-description: Set up Ruby with Bundler and gem cache
+description: Set up Ruby with Bundler and gem cache, authenticated against AWS CodeArtifact
 
 inputs:
   ruby-version:
@@ -10,10 +10,61 @@ inputs:
     description: Enable Bundler dependency cache
     required: false
     default: 'true'
+  aws-role-arn:
+    description: >-
+      ARN of the AWS OIDC role to assume for fetching an AWS CodeArtifact
+      authorization token (read or publish role, depending on the caller).
+    required: true
+  aws-region:
+    description: AWS region of the CodeArtifact domain
+    required: false
+    default: 'us-east-1'
+  codeartifact-domain:
+    description: CodeArtifact domain name
+    required: false
+    default: 'republic'
+  codeartifact-domain-owner:
+    description: AWS account id that owns the CodeArtifact domain
+    required: false
+    default: '570660171057'
+  codeartifact-repository-endpoint:
+    description: CodeArtifact ruby repository endpoint (must match the Gemfile source)
+    required: false
+    default: 'https://republic-570660171057.d.codeartifact.us-east-1.amazonaws.com/ruby/ruby-joinrepublic'
 
 runs:
   using: composite
   steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        role-session-name: fontello-rails-converter-codeartifact
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Get AWS CodeArtifact authorization token
+      shell: bash
+      run: |
+        CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+          --domain '${{ inputs.codeartifact-domain }}' \
+          --domain-owner '${{ inputs.codeartifact-domain-owner }}' \
+          --region '${{ inputs.aws-region }}' \
+          --query authorizationToken \
+          --output text)
+        if [ -z "$CODEARTIFACT_AUTH_TOKEN" ] || [ "$CODEARTIFACT_AUTH_TOKEN" = "None" ]; then
+          echo "::error::Failed to obtain a CodeArtifact authorization token. Ensure AWS credentials are configured and the role has codeartifact:GetAuthorizationToken." >&2
+          exit 1
+        fi
+        echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
+        echo "CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN" >> "$GITHUB_ENV"
+
+    - name: Configure Bundler for AWS CodeArtifact
+      shell: bash
+      run: |
+        bundle config set --global \
+          '${{ inputs.codeartifact-repository-endpoint }}' \
+          "aws:${CODEARTIFACT_AUTH_TOKEN}"
+
     - name: Set up Ruby and Bundler cache
       uses: ruby/setup-ruby@v1
       with:

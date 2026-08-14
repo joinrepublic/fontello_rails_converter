@@ -17,6 +17,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write # required for OIDC login to AWS CodeArtifact
 
 concurrency:
   group: ci-pipeline-${{ github.workflow }}-${{ github.ref }}
@@ -70,6 +71,7 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
+          aws-role-arn: ${{ vars.AWS_CODEARTIFACT_READ_ROLE_ARN }}
 
       - name: Run RuboCop
         run: bundle exec rubocop
@@ -97,6 +99,7 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
+          aws-role-arn: ${{ vars.AWS_CODEARTIFACT_READ_ROLE_ARN }}
 
       - name: Run RSpec
         run: bundle exec rspec
