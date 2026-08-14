@@ -58,6 +58,12 @@ runs:
         echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
         echo "CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN" >> "$GITHUB_ENV"
 
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        bundler-cache: false
+
     - name: Configure Bundler for AWS CodeArtifact
       shell: bash
       run: |
@@ -65,8 +71,9 @@ runs:
           '${{ inputs.codeartifact-repository-endpoint }}' \
           "aws:${CODEARTIFACT_AUTH_TOKEN}"
 
-    - name: Set up Ruby and Bundler cache
+    - name: Set up Bundler cache
+      if: inputs.bundler-cache == 'true'
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ inputs.ruby-version }}
-        bundler-cache: ${{ inputs.bundler-cache }}
+        bundler-cache: true
