@@ -66,15 +66,6 @@ jobs:
           VERSION=$(ruby -e "spec = Gem::Specification.load('fontello_rails_converter.gemspec'); puts spec.version.to_s")
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Configure RubyGems credentials for AWS CodeArtifact
-        run: |
-          mkdir -p "$HOME/.gem"
-          cat > "$HOME/.gem/credentials" <<EOF
-          ---
-          :codeartifact: aws:${CODEARTIFACT_AUTH_TOKEN}
-          EOF
-          chmod 0600 "$HOME/.gem/credentials"
-
       - name: Check whether version is already published
         id: publish_guard
         env:
@@ -96,5 +87,5 @@ jobs:
         if: steps.publish_guard.outputs.publish_needed == 'true'
         run: |
           GEM_FILE=$(ls -1 *.gem | head -n 1)
-          gem push --key codeartifact --host "${CODEARTIFACT_REPOSITORY}" "${GEM_FILE}"
+          gem push --host "https://aws:${CODEARTIFACT_AUTH_TOKEN}@${CODEARTIFACT_REPOSITORY#https://}" "${GEM_FILE}"
 
