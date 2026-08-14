@@ -59,7 +59,7 @@ runs:
         echo "CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN" >> "$GITHUB_ENV"
 
     - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
+      uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
       with:
         ruby-version: ${{ inputs.ruby-version }}
         bundler-cache: false
@@ -73,7 +73,7 @@ runs:
 
     - name: Set up Bundler cache
       if: inputs.bundler-cache == 'true'
-      uses: ruby/setup-ruby@v1
+      uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
       with:
         ruby-version: ${{ inputs.ruby-version }}
         bundler-cache: true
