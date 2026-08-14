@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.10](https://github.com/joinrepublic/fontello_rails_converter/compare/fontello_rails_converter/v0.4.9...fontello_rails_converter/v0.4.10) (2026-08-14)
+
+
+### Bug Fixes
+
+* [DOPS-4938] install Ruby before configuring Bundler CodeArtifact credentials ([dad71ba](https://github.com/joinrepublic/fontello_rails_converter/commit/dad71ba6644b61137240b4af835db645d63b3c8c))
+* [DOPS-4938] use Bearer token gem credentials for CodeArtifact push ([248074a](https://github.com/joinrepublic/fontello_rails_converter/commit/248074a65870f1d1f5661d42107a124cd535fe67))
+* [DOPS-4938] use Bearer token gem credentials for CodeArtifact push (matches docx_replace) ([b7480d5](https://github.com/joinrepublic/fontello_rails_converter/commit/b7480d56b55c939a27eec9b58260e8c5cfb2540e))
+* [DOPS-4938] use URL-embedded credentials for gem push to CodeArtifact ([5f7b0e8](https://github.com/joinrepublic/fontello_rails_converter/commit/5f7b0e8d35055f9d1788402116f83a87391c6460))
+* [DOPS-4938] use URL-embedded credentials for gem push to CodeArtifact ([5e23559](https://github.com/joinrepublic/fontello_rails_converter/commit/5e23559de7eb08d27c5a1e7192fd66ac2f63166a))
+
 ## [0.4.9](https://github.com/joinrepublic/fontello_rails_converter/compare/fontello_rails_converter-v0.4.8...fontello_rails_converter/v0.4.9) (2026-03-06)
 
 
